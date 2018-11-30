@@ -1,5 +1,5 @@
 /* 
-Activité 1
+Activités 1, 2 et 3
 */
 
 // Liste des liens Web à afficher. Un lien est défini par :
@@ -26,7 +26,12 @@ var listeLiens = [
 
 // TODO : compléter ce fichier pour ajouter les liens à la page web
 
+// contenuElt contient l'élément identifié par "contenu"
 var contenuElt = document.getElementById("contenu");
+
+// Changement des titres
+document.querySelector("title").textContent = "Partage de liens";
+document.querySelector("h1").textContent = "Page de partage de liens";
 
 // Fonction d'ajout d'un lien 
 function ajouterLien(titre, url, auteur) {
@@ -59,19 +64,40 @@ function ajouterLien(titre, url, auteur) {
     contenuElt.insertBefore(lienElt, contenuElt.firstChild);
 }
 
+// Fonction pour validater une url
+function validerUrl(url) {
+    
+    // Ajoute "http://" au début de l'url si elle ne commence ni par "https://", "http://", "ftp://" ou "ftps://"
+    if ( !(url.startsWith("http://")) && !(url.startsWith("https://")) && !(url.startsWith("ftp://")) && !(url.startsWith("ftps://")) ) {
+
+        url = "http://" + url;
+    }
+    
+    // Expression régulière pour vérifier la validité de l'url
+    var regex = /^(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/|ftp:\/\/|ftps:\/\/)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?$/;
+    
+    return regex.test(url);
+}
+
 // Ajout des liens du tableau sur la page
 for (var i = listeLiens.length - 1; i >= 0; i--) { 
     ajouterLien(listeLiens[i].titre, listeLiens[i].url, listeLiens[i].auteur);
-}
+} 
 
-
-/* 
-Activité 2
-*/
-
-// Changement des titres
-document.querySelector("title").textContent = "Activité 2";
-document.querySelector("h1").textContent = "Activité 2";
+// Recupération des liens se trouvant sur le serveur
+ajaxGet("https://oc-jswebsrv.herokuapp.com/api/liens", function (reponse) {
+    
+    // Récupération de tous les liens dans un tableau javascript
+    var liens = JSON.parse(reponse);
+    
+    // Ajout de chaque lien du tableau si son url est valide
+    liens.forEach(function (lien) {
+        
+        if (validerUrl(lien.url)) {
+            ajouterLien(lien.titre, lien.url, lien.auteur);
+        }
+    });
+});
 
 // Création du boutton "Ajouter le lien"
 var ajouterLienBtn = document.createElement("button");
@@ -130,11 +156,12 @@ ajouterLienBtn.addEventListener("click", function (e) {
     formElt.appendChild(ajouterBtn);
     
     // Fait disparaître le bouton "Ajouter le lien" et fait apparaître à sa place le formulaire
-    pElt.replaceChild(formElt, ajouterLienBtn);        
-        
+    pElt.replaceChild(formElt, ajouterLienBtn); 
+    
     // Gestionnaire d'ajout du lien créé sur la page
     formElt.addEventListener("submit", function (e) { 
         
+        // Annulation du comportement par défaut de l'évènement e
         e.preventDefault();
         
         // Les variables d'infos du lien
@@ -142,39 +169,56 @@ ajouterLienBtn.addEventListener("click", function (e) {
         var titre = titreElt.value;
         var url = urlElt.value;
 
-        // Ajoute "http://" au début de l'url si elle ne commence ni par "https://", "http://", "ftp://" ou "ftps://"
-        if ( !(url.startsWith("http://")) && !(url.startsWith("https://")) && !(url.startsWith("ftp://")) && !(url.startsWith("ftps://")) ) {
-            url = "http://" + url;
-        }
-
         // Création d'un élément "p" pour le message d'information
         var infoMsg = document.createElement("p");
 
-        // Expression régulière pour vérifier la validité de l'url
-        var regex = /^(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/|ftp:\/\/|ftps:\/\/)?[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?$/;
-
         // Ajout du lien ou non selon le résulatat de la vérification
-        if (regex.test(url)) {
+        if (validerUrl(url)) { // url valide
+            
+            // Data sert à stocker les infos du lien sous la forme d'un objet FormData
+            var data = new FormData();
+            data.append("auteur", auteur);
+            data.append("titre", titre);
+            data.append("url", url);
+            
+            // succesAjout sert à savoir si l'ajout du lien sur le serveur a été réussi
+            var succesAjout = false;
+            
+            // Ajout du lien sur le serveur
+            ajaxPost("https://oc-jswebsrv.herokuapp.com/api/lien", data, function (reponse) {
 
-            // Ajout du nouveau lien sur la page
-            ajouterLien(titre, url, auteur);
+                // Ajout du nouveau lien sur la page
+                ajouterLien(titre, url, auteur);
+                
+                // L'ajout du lien a été réussi
+                succesAjout = true; 
 
-            // Message de confirmation de l'ajout du lien
-            infoMsg.textContent = 'Le lien "' + titre + '" a bien été ajouté.';
-            infoMsg.setAttribute("style", "background-color: rgb(214, 236, 246); padding: 20px 10px;"); 
-            // color: rgba(0, 0, 0, 0.7); background-color: rgba(45, 154, 206, 0.2)
-
+            }, true); 
+            
+            if (succesAjout) {
+                
+                // Message de confirmation de l'ajout du lien
+                infoMsg.textContent = 'Le lien "' + titre + '" a bien été ajouté.';
+                infoMsg.setAttribute("style", "background-color: rgb(214, 236, 246); padding: 20px 10px;");
+                
+            } else {
+                
+                // Le message à afficher pour informer l'utilisateur
+                infoMsg.textContent = "Erreur réseau ou serveur indisponible.";
+                infoMsg.setAttribute("style", "background-color: rgba(237, 71, 104, 0.5); padding: 20px 10px;");
+            }
+            
         } else {
 
             // Le message à afficher pour informer l'utilisateur
-            infoMsg.textContent = 'Le lien "' + titre + " n'a pas été ajouté car l'url est invalide.";
+            infoMsg.textContent = "L'url " + url + " est invalide.";
             infoMsg.setAttribute("style", "background-color: rgba(237, 71, 104, 0.5); padding: 20px 10px;");
 
         }              
 
         // Fait réapparaître le bouton "Ajouter le lien " à la place du formulaire 
-        pElt.replaceChild(ajouterLienBtn, formElt);             
-
+        pElt.replaceChild(ajouterLienBtn, formElt);  
+        
         // Affiche le message d'information
         document.body.insertBefore(infoMsg, pElt);
 
